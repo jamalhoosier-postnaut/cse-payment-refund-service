@@ -1,0 +1,61 @@
+name: Postman - Onboard Payments API
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  onboard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Confirm spec exists
+        run: |
+          ls -la specs
+          test -f specs/openapi.yaml && echo "✅ Found specs/openapi.yaml"
+
+      - name: Bootstrap (workspace + Spec Hub + collections + environments)
+        id: bootstrap
+        uses: postman-cs/postman-bootstrap-action@v0
+        with:
+          # Fresh workspace name guarantees clean mock/monitor creation
+          project-name: cse-payment-refund-service-v1
+
+          domain: payments
+          domain-code: PAY
+          requester-email: jamal.hoosier@postman.com
+
+          # Public repo: fetch spec directly
+          spec-url: https://raw.githubusercontent.com/jamal.hoosier-postnaut/cse-payment-refund-service/main/specs/openapi.yaml
+
+          environments-json: '["prod","stage"]'
+          system-env-map-json: '{}'
+          governance-mapping-json: '{}'
+
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
+          github-token: ${{ secrets.GH_PAT }}
+
+      - name: Repo Sync (export + mock + monitor)
+        uses: postman-cs/postman-repo-sync-action@v0
+        with:
+          project-name: cse-payment-refund-service-v1
+          workspace-id: ${{ steps.bootstrap.outputs.workspace-id }}
+
+          baseline-collection-id: ${{ steps.bootstrap.outputs.baseline-collection-id }}
+          smoke-collection-id: ${{ steps.bootstrap.outputs.smoke-collection-id }}
+          contract-collection-id: ${{ steps.bootstrap.outputs.contract-collection-id }}
+
+          environments-json: '["prod","stage"]'
+          env-runtime-urls-json: '{"prod":"https://payments-api.example.com","stage":"https://payments-stage.example.com"}'
+
+          generate-ci-workflow: false
+
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
+          github-token: ${{ secrets.GH_PAT }}
